@@ -40,11 +40,12 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173", 
         "http://localhost:3000",
-        "https://*.vercel.app",  # Vercel 배포 도메인
-        "*"  # 임시로 모든 도메인 허용 (나중에 특정 도메인으로 제한)
+        "https://dinagding-studio.vercel.app",  # 정확한 Vercel 도메인
+        "https://*.vercel.app",  # Vercel 서브도메인
+        "*"  # 모든 도메인 허용
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
