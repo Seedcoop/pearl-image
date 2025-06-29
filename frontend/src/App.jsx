@@ -29,15 +29,35 @@ function App() {
   }
 
   // 프리셋 선택 (이미 선택된 프리셋을 다시 클릭하면 해제)
-  const handlePresetSelect = (presetKey) => {
-    const presets = assetTypeStylePresets[currentAssetType] || {}
-    const newPreset = presets[presetKey] || null
-    
-    // 이미 선택된 프리셋을 다시 클릭하면 해제
-    if (selectedPreset && selectedPreset === newPreset) {
+  const handlePresetSelect = (presetKeyOrObject) => {
+    // presetKeyOrObject가 문자열이면 기본 프리셋, 객체면 사용자 정의 프리셋 또는 null
+    if (presetKeyOrObject === null) {
+      // 프리셋 해제
       setSelectedPreset(null)
+      return
+    }
+
+    if (typeof presetKeyOrObject === 'string') {
+      // 기본 프리셋 처리
+      const presets = assetTypeStylePresets[currentAssetType] || {}
+      const newPreset = presets[presetKeyOrObject] || null
+      
+      // 이미 선택된 프리셋을 다시 클릭하면 해제
+      if (selectedPreset && selectedPreset === newPreset) {
+        setSelectedPreset(null)
+      } else {
+        setSelectedPreset(newPreset)
+      }
     } else {
-      setSelectedPreset(newPreset)
+      // 사용자 정의 프리셋 처리 (객체)
+      const customPreset = presetKeyOrObject
+      
+      // 이미 선택된 사용자 정의 프리셋을 다시 클릭하면 해제
+      if (selectedPreset && selectedPreset.id && selectedPreset.id === customPreset.id) {
+        setSelectedPreset(null)
+      } else {
+        setSelectedPreset(customPreset)
+      }
     }
   }
 
