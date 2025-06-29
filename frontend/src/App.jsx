@@ -52,11 +52,16 @@ function App() {
       }
 
       const API_URL = import.meta.env.VITE_API_URL || 'https://pearl-image-production.up.railway.app'
-      const response = await fetch(`${API_URL}/generate`, {
+      // 캐시 무시를 위한 timestamp 추가
+      const timestamp = Date.now()
+      const response = await fetch(`${API_URL}/generate?t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
         },
+        cache: 'no-store', // 브라우저 캐시 완전히 무시
         body: JSON.stringify({
           prompt: finalPrompt,
           aspect_ratio: aspectRatio,
