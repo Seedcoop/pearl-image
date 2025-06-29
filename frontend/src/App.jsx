@@ -51,7 +51,7 @@ function App() {
         finalPrompt = prompt + ', ' + selectedPreset.prompt
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'https://pearl-image-production.up.railway.app'
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       // 캐시 무시를 위한 timestamp 추가
       const timestamp = Date.now()
       const response = await fetch(`${API_URL}/generate?t=${timestamp}`, {

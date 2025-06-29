@@ -1,37 +1,54 @@
 import os
-import asyncio
 import base64
-from datetime import datetime
 from typing import Optional
-from google import genai
-from google.genai import types
 from PIL import Image
 from io import BytesIO
-from fastapi import FastAPI, HTTPException, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
-import aiofiles
 from pydantic import BaseModel, Field
 from rembg import remove
+import json
+import tempfile
+
+# --- Vertex AI Imports ---
+import vertexai
+from vertexai.vision_models import ImageGenerationModel
 
 # 환경변수 로드
 load_dotenv()
 
-# Gemini API 설정 - 하나의 변수로 통일
-API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY 또는 GOOGLE_API_KEY 환경변수가 필요합니다")
+# --- Vertex AI 설정 ---
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+GCP_REGION = os.getenv("GCP_REGION")
 
-# Gemini Client 초기화
-client = genai.Client(api_key=API_KEY)
+if not GCP_PROJECT_ID or not GCP_REGION:
+    raise ValueError("GCP_PROJECT_ID와 GCP_REGION 환경변수가 필요합니다.")
+
+# --- 프로덕션/로컬 환경에 따른 인증 분기 ---
+# Railway 같은 프로덕션 환경에서는 GCP_SA_KEY_JSON 환경변수에서 서비스 계정 키를 읽어 인증합니다.
+# 로컬 환경에서는 gcloud auth application-default login으로 설정된 ADC를 사용합니다.
+gcp_sa_key_json = os.getenv("GCP_SA_KEY_JSON")
+if gcp_sa_key_json:
+    try:
+        # 서비스 계정 키를 임시 파일에 쓰고, 그 경로를 환경변수로 설정
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_f:
+            temp_f.write(gcp_sa_key_json)
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_f.name
+        print("인증 방식: 서비스 계정 (GCP_SA_KEY_JSON)")
+    except Exception as e:
+        print(f"서비스 계정 처리 중 오류 발생: {e}")
+else:
+    print("인증 방식: Application Default Credentials (로컬)")
+
+# Vertex AI 초기화
+vertexai.init(project=GCP_PROJECT_ID, location=GCP_REGION)
 
 # FastAPI 앱 초기화
 app = FastAPI(
     title="Pearl Image Generator",
-    description="Text-to-Image Generation using Gemini Imagen 4 API",
-    version="1.0.0"
+    description="Text-to-Image Generation using Vertex AI Imagen",
+    version="1.1.0"
 )
 
 # CORS 설정 추가
@@ -67,8 +84,6 @@ async def generate_image(request: ImageRequest):
     try:
         # 최종 프롬프트 구성
         final_prompt = request.prompt
-        
-        # rembg를 사용할 예정이므로 일반적인 배경으로 생성
         final_prompt += ", clean background"
         
         print(f"Final prompt: {final_prompt}")
@@ -76,36 +91,46 @@ async def generate_image(request: ImageRequest):
         print(f"Guidance scale: {request.guidance_scale}")
         print(f"Seed: {request.seed}")
         
-        # 이미지 생성 설정 구성 - 가장 기본적인 파라미터만 사용
-        config = types.GenerateImagesConfig(
-            number_of_images=1
-        )
-        
-        # 실제 Imagen API 호출
+        # 실제 Vertex AI Imagen API 호출
         try:
-            print(f"Calling Imagen API with prompt: {final_prompt}")
-            response = client.models.generate_images(
-                model='imagen-4.0-generate-preview-06-06',
-                prompt=final_prompt,
-                config=config
-            )
+            print(f"Calling Vertex AI Imagen API with prompt: {final_prompt}")
             
-            # 생성된 이미지가 있는지 확인
-            if not response.generated_images:
-                raise Exception("생성된 이미지가 없습니다.")
+            # 모델 로드 (Imagen 3 정확한 이름으로 변경)
+            model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-002")
+            
+            # 이미지 생성
+            response = model.generate_images(
+                prompt=final_prompt,
+                number_of_images=1,
+                seed=request.seed,
+                aspect_ratio=request.aspect_ratio,
+                guidance_scale=request.guidance_scale,
+                add_watermark=False  # 워터마크 비활성화
+            )
+
+            print("--- Full API Response DUMP ---")
+            print(response)
+            print("----------------------------")
+            
+            if not response.images:
+                raise Exception("API가 이미지를 생성하지 않았습니다 (response.images is empty).")
             
             # 첫 번째 생성된 이미지 사용
-            generated_image = response.generated_images[0]
-            
+            generated_image = response.images[0]
+
+            # Vertex AI Image 객체에서 PIL Image로 변환
+            # _image_bytes는 base64로 인코딩된 이미지 데이터
+            img_bytes = generated_image._image_bytes
+            img = Image.open(BytesIO(img_bytes))
+
         except Exception as api_error:
-            print(f"Imagen API 호출 오류: {str(api_error)}")
+            print(f"Vertex AI Imagen API 호출 오류: {str(api_error)}")
             # 오류 발생 시 더미 이미지 생성 (백업용)
             from PIL import ImageDraw, ImageFont
             
             img = Image.new('RGB', (512, 512), color='lightcoral')
             draw = ImageDraw.Draw(img)
             
-            # 에러 메시지 표시
             try:
                 font = ImageFont.load_default()
                 error_text = f"API Error: {str(api_error)[:100]}..."
@@ -113,59 +138,24 @@ async def generate_image(request: ImageRequest):
                 draw.text((10, 40), f"Prompt: {request.prompt[:50]}...", fill='darkred', font=font)
             except:
                 draw.text((10, 250), "API Error", fill='darkred')
-            
-            # 더미 이미지로 계속 진행
-            generated_image = type('obj', (object,), {'image': img})()
         
         # 생성된 이미지를 base64로 인코딩하여 브라우저로 직접 반환
         try:
-            # generated_image에서 PIL Image 객체 추출
-            if hasattr(generated_image, 'image'):
-                genai_img = generated_image.image
-            else:
-                genai_img = generated_image
-            
-            print(f"Image type: {type(genai_img)}")
-            print(f"Image attributes: {dir(genai_img)}")
-            
-            # Google GenAI Image를 PIL Image로 변환
-            if hasattr(genai_img, '_pil_image'):
-                # _pil_image 속성이 있는 경우
-                img = genai_img._pil_image
-            elif hasattr(genai_img, 'to_pil'):
-                # to_pil 메서드가 있는 경우
-                img = genai_img.to_pil()
-            elif hasattr(genai_img, 'data'):
-                # 바이트 데이터가 있는 경우
-                img = Image.open(BytesIO(genai_img.data))
-            elif hasattr(genai_img, '_image_bytes'):
-                # _image_bytes 속성이 있는 경우
-                img = Image.open(BytesIO(genai_img._image_bytes))
-            else:
-                # 다른 방법으로 시도
-                try:
-                    # genai_img 자체를 PIL Image로 변환 시도
-                    img_bytes = bytes(genai_img)
-                    img = Image.open(BytesIO(img_bytes))
-                except:
-                    # 실패 시 더미 이미지 생성
-                    img = Image.new('RGB', (512, 512), color='white')
-                    print("Failed to convert GenAI Image, using dummy image")
-            
-            print(f"Converted PIL Image mode: {img.mode}")
+            print(f"Successfully converted to PIL Image: {img.size} {img.mode}")
             
             # 투명 배경 처리 - rembg AI 모델 사용
             if request.transparent_bg:
                 print("AI 기반 배경 제거 시작...")
                 try:
                     # rembg를 사용하여 AI 기반 배경 제거
+                    # rembg는 RGBA 모드를 기대하므로 변환
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
                     img = remove(img)
                     print("AI 배경 제거 완료!")
                 except Exception as rembg_error:
                     print(f"rembg 오류: {str(rembg_error)}")
                     # rembg 실패 시 원본 이미지 유지
-                    if img.mode != 'RGBA':
-                        img = img.convert('RGBA')
             
             # PIL Image를 메모리 버퍼에 저장
             img_buffer = BytesIO()
@@ -186,7 +176,7 @@ async def generate_image(request: ImageRequest):
             print(f"이미지 처리 오류: {str(img_error)}")
             import traceback
             traceback.print_exc()
-            raise Exception(f"이미지 처리 중 오류가 발생했습니다: {str(img_error)}")
+            raise HTTPException(status_code=500, detail=f"이미지 처리 중 심각한 오류가 발생했습니다: {str(img_error)}")
         
     except Exception as e:
         print(f"Error during image generation: {str(e)}")
@@ -202,8 +192,8 @@ async def api_info():
     """API 정보"""
     return {
         "service": "Pearl Image Generator",
-        "version": "1.0.0",
-        "description": "Text-to-Image Generation using Gemini Imagen 4 API",
+        "version": "1.1.0",
+        "description": "Text-to-Image Generation using Vertex AI Imagen",
         "endpoints": {
             "/generate": "Generate image from text",
             "/health": "Health check",
