@@ -125,19 +125,21 @@ async def generate_image(request: ImageRequest):
 
         except Exception as api_error:
             print(f"Vertex AI Imagen API 호출 오류: {str(api_error)}")
-            # 오류 발생 시 더미 이미지 생성 (백업용)
-            from PIL import ImageDraw, ImageFont
             
-            img = Image.new('RGB', (512, 512), color='lightcoral')
-            draw = ImageDraw.Draw(img)
+            # 구체적인 에러 메시지 생성
+            error_detail = str(api_error)
+            if "Quota exceeded" in error_detail or "429" in error_detail:
+                error_message = "API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
+            elif "Safety" in error_detail or "blocked" in error_detail:
+                error_message = "프롬프트가 안전 정책에 위배되어 이미지를 생성할 수 없습니다. 다른 프롬프트로 시도해주세요."
+            elif "Authentication" in error_detail or "401" in error_detail:
+                error_message = "서버에서 Google Cloud 인증에 실패했습니다. 관리자에게 문의해주세요."
+            elif "Permission" in error_detail or "403" in error_detail:
+                error_message = "서버에 Vertex AI 사용 권한이 없습니다. 관리자에게 문의해주세요."
+            else:
+                error_message = f"이미지 생성 중 오류가 발생했습니다: {error_detail}"
             
-            try:
-                font = ImageFont.load_default()
-                error_text = f"API Error: {str(api_error)[:100]}..."
-                draw.text((10, 10), error_text, fill='darkred', font=font)
-                draw.text((10, 40), f"Prompt: {request.prompt[:50]}...", fill='darkred', font=font)
-            except:
-                draw.text((10, 250), "API Error", fill='darkred')
+            raise HTTPException(status_code=500, detail=error_message)
         
         # 생성된 이미지를 base64로 인코딩하여 브라우저로 직접 반환
         try:
