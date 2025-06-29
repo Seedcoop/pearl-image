@@ -114,7 +114,8 @@ async def generate_image(request: ImageRequest):
             print("----------------------------")
             
             if not response.images:
-                raise Exception("API가 이미지를 생성하지 않았습니다 (response.images is empty).")
+                # 안전 필터에 의해 이미지가 생성되지 않았을 가능성이 높음
+                raise HTTPException(status_code=400, detail="입력된 프롬프트가 안전 정책에 위배될 수 있어 이미지를 생성할 수 없습니다. 더 일반적인 단어를 사용해 보세요.")
             
             # 첫 번째 생성된 이미지 사용
             generated_image = response.images[0]
