@@ -13,11 +13,11 @@ const AssetTypeTabs = ({ currentAssetType, onAssetTypeChange }) => {
   return (
     <section>
       <div className="border-b border-pearl-border">
-        <nav className="flex px-2 gap-2 overflow-x-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="flex px-2 gap-1 sm:gap-2 overflow-x-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {assetTypes.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              className={`flex flex-col items-center justify-center border-b-[2px] pb-2 pt-2 px-2 group whitespace-nowrap transition-colors ${
+              className={`flex flex-col items-center justify-center border-b-[2px] pb-3 pt-3 px-3 sm:px-2 group whitespace-nowrap transition-colors min-w-0 ${
                 currentAssetType === key
                   ? 'border-b-pearl-primary text-pearl-primary'
                   : 'border-b-transparent text-pearl-text-muted hover:text-pearl-text hover:border-b-pearl-accent'
@@ -30,7 +30,7 @@ const AssetTypeTabs = ({ currentAssetType, onAssetTypeChange }) => {
                     ? 'text-pearl-primary'
                     : 'text-pearl-text-muted group-hover:text-pearl-accent'
                 }`}
-                size={18}
+                size={20}
               />
               <p className="text-xs font-semibold leading-normal tracking-[0.015em]">{label}</p>
             </button>

@@ -30,11 +30,11 @@ const PromptInput = ({ prompt, onPromptChange, transparentBg, onTransparentBgCha
             type="checkbox" 
             id="transparent_bg" 
             name="transparent_bg" 
-            className="w-4 h-4 text-pearl-primary bg-pearl-bg-medium border-pearl-border rounded focus:ring-pearl-primary focus:ring-2"
+            className="w-5 h-5 text-pearl-primary bg-pearl-bg-medium border-pearl-border rounded focus:ring-pearl-primary focus:ring-2"
             checked={transparentBg}
             onChange={(e) => onTransparentBgChange(e.target.checked)}
           />
-          <label htmlFor="transparent_bg" className="text-pearl-text text-sm font-medium">투명 배경</label>
+          <label htmlFor="transparent_bg" className="text-pearl-text text-sm font-medium cursor-pointer">투명 배경</label>
           <span className="text-pearl-text-muted text-xs">(에셋에 적합)</span>
         </div>
       </div>

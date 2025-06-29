@@ -6,7 +6,7 @@ const GenerateButton = ({ onGenerate, isGenerating }) => {
     <button 
       onClick={onGenerate}
       disabled={isGenerating}
-      className="w-full flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-6 pearl-abyss-button text-base font-bold leading-normal tracking-[0.015em] shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 sm:h-12 px-6 pearl-abyss-button text-base font-bold leading-normal tracking-[0.015em] shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
     >
       {isGenerating ? (
         <>

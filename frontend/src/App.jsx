@@ -79,21 +79,54 @@ function App() {
         
         setResult(newResult)
         
-        // 자동으로 갤러리에 저장
-        const galleryItems = JSON.parse(localStorage.getItem('assetGallery') || '[]')
-        const newItem = {
-          id: Date.now(),
-          imageData: newResult.image_data,
-          prompt: newResult.prompt,
-          timestamp: newResult.timestamp,
-          assetType: newResult.assetType,
-          preset: newResult.preset
+        // 자동으로 갤러리에 저장 (용량 제한 적용)
+        try {
+          const galleryItems = JSON.parse(localStorage.getItem('assetGallery') || '[]')
+          const newItem = {
+            id: Date.now(),
+            imageData: newResult.image_data,
+            prompt: newResult.prompt,
+            timestamp: newResult.timestamp,
+            assetType: newResult.assetType,
+            preset: newResult.preset
+          }
+          
+          // 새 아이템을 맨 앞에 추가
+          galleryItems.unshift(newItem)
+          
+          // 최대 15개까지만 유지 (용량 절약)
+          const MAX_GALLERY_ITEMS = 15
+          if (galleryItems.length > MAX_GALLERY_ITEMS) {
+            galleryItems.splice(MAX_GALLERY_ITEMS)
+          }
+          
+          localStorage.setItem('assetGallery', JSON.stringify(galleryItems))
+          console.log('이미지가 자동으로 갤러리에 저장되었습니다!')
+        } catch (storageError) {
+          console.warn('갤러리 저장 실패:', storageError)
+          // 저장 공간이 부족한 경우 기존 갤러리를 절반으로 줄이고 다시 시도
+          try {
+            const galleryItems = JSON.parse(localStorage.getItem('assetGallery') || '[]')
+            const reducedItems = galleryItems.slice(0, Math.floor(galleryItems.length / 2))
+            localStorage.setItem('assetGallery', JSON.stringify(reducedItems))
+            
+            // 다시 저장 시도
+            const newItem = {
+              id: Date.now(),
+              imageData: newResult.image_data,
+              prompt: newResult.prompt,
+              timestamp: newResult.timestamp,
+              assetType: newResult.assetType,
+              preset: newResult.preset
+            }
+            reducedItems.unshift(newItem)
+            localStorage.setItem('assetGallery', JSON.stringify(reducedItems))
+            console.log('갤러리 정리 후 이미지가 저장되었습니다!')
+          } catch (retryError) {
+            console.error('갤러리 저장에 실패했습니다:', retryError)
+            alert('갤러리 저장 공간이 부족합니다. 브라우저 캐시를 정리해주세요.')
+          }
         }
-        
-        galleryItems.unshift(newItem)
-        localStorage.setItem('assetGallery', JSON.stringify(galleryItems))
-        
-        console.log('이미지가 자동으로 갤러리에 저장되었습니다!')
       } else {
         setError(data.error || '알 수 없는 오류가 발생했습니다.')
       }
@@ -106,15 +139,15 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-pearl-bg-dark text-pearl-text flex flex-col">
+    <div className="min-h-screen bg-pearl-bg-dark text-pearl-text flex flex-col">
       <Header onGalleryClick={() => setShowGallery(true)} />
 
-      {/* Main Content - Left/Right Split */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Controls */}
-        <div className="w-1/2 flex flex-col border-r border-pearl-border">
+      {/* Main Content - Responsive Layout */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Controls Panel */}
+        <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-r lg:border-b-0 border-pearl-border">
           {/* Prompt Input Section */}
-          <div className="p-4 border-b border-pearl-border">
+          <div className="p-3 md:p-4 border-b border-pearl-border">
             <PromptInput
               prompt={prompt}
               onPromptChange={setPrompt}
@@ -135,7 +168,7 @@ function App() {
             </div>
 
             {/* Style Presets */}
-            <div className="p-4 border-b border-pearl-border">
+            <div className="p-3 md:p-4 border-b border-pearl-border">
               <StylePresets
                 currentAssetType={currentAssetType}
                 selectedPreset={selectedPreset}
@@ -144,7 +177,7 @@ function App() {
             </div>
 
             {/* Advanced Settings */}
-            <div className="p-4">
+            <div className="p-3 md:p-4">
               <AdvancedSettings
                 aspectRatio={aspectRatio}
                 onAspectRatioChange={setAspectRatio}
@@ -157,7 +190,7 @@ function App() {
           </div>
 
           {/* Generate Button */}
-          <div className="p-4 border-t border-pearl-border">
+          <div className="p-3 md:p-4 border-t border-pearl-border">
             <GenerateButton
               onGenerate={handleGenerate}
               isGenerating={isGenerating}
@@ -165,8 +198,8 @@ function App() {
           </div>
         </div>
 
-        {/* Right Panel - Results */}
-        <div className="w-1/2 flex flex-col">
+        {/* Results Panel */}
+        <div className="w-full lg:w-1/2 flex flex-col min-h-[400px] lg:min-h-0">
           <ResultSection
             isGenerating={isGenerating}
             result={result}

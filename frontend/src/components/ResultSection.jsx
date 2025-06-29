@@ -47,23 +47,23 @@ const ResultSection = ({ isGenerating, result, error, onGalleryClick }) => {
 
   if (result) {
     return (
-      <div className="flex-1 flex flex-col p-4 overflow-y-auto">
-        <h2 className="text-pearl-text text-lg font-bold mb-3">생성된 에셋</h2>
+      <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-y-auto">
+        <h2 className="text-pearl-text text-base sm:text-lg font-bold mb-3">생성된 에셋</h2>
         
         {/* Image Container */}
-        <div className="flex-1 flex justify-center items-center mb-4">
-          <div className="bg-pearl-bg-medium rounded-lg p-3 shadow-lg max-w-full max-h-full">
-            <div className="bg-white rounded-lg p-2" style={{
+        <div className="flex-1 flex justify-center items-center mb-3 sm:mb-4">
+          <div className="bg-pearl-bg-medium rounded-lg p-2 sm:p-3 shadow-lg max-w-full max-h-full">
+            <div className="bg-white rounded-lg p-1 sm:p-2" style={{
               backgroundImage: 'none',
               backgroundColor: '#f8f9fa'
             }}>
               <img 
                 src={result.image_data} 
                 alt="생성된 에셋" 
-                className="max-w-full max-h-full h-auto rounded-lg object-contain"
+                className="max-w-full max-h-full h-auto rounded-lg object-contain w-full"
                 style={{
                   backgroundColor: 'transparent',
-                  maxHeight: '60vh'
+                  maxHeight: '50vh'
                 }}
               />
             </div>
@@ -80,14 +80,14 @@ const ResultSection = ({ isGenerating, result, error, onGalleryClick }) => {
           <div className="flex gap-2">
             <button 
               onClick={handleDownload}
-              className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-pearl-accent text-pearl-bg-dark rounded-lg font-semibold hover:bg-yellow-600 transition-colors text-sm"
+              className="flex-1 inline-flex items-center justify-center px-4 py-3 sm:py-2 bg-pearl-accent text-pearl-bg-dark rounded-lg font-semibold hover:bg-yellow-600 transition-colors text-sm touch-manipulation"
             >
               <Download className="mr-1" size={16} />
               다운로드
             </button>
             <button 
               onClick={handleViewGallery}
-              className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-pearl-primary text-white rounded-lg font-semibold hover:bg-red-700 transition-colors text-sm"
+              className="flex-1 inline-flex items-center justify-center px-4 py-3 sm:py-2 bg-pearl-primary text-white rounded-lg font-semibold hover:bg-red-700 transition-colors text-sm touch-manipulation"
             >
               <Eye className="mr-1" size={16} />
               갤러리 보기
@@ -100,12 +100,13 @@ const ResultSection = ({ isGenerating, result, error, onGalleryClick }) => {
 
   // 초기 상태 - 아무것도 없을 때
   return (
-    <div className="flex-1 flex justify-center items-center p-4">
-      <div className="text-center space-y-4 max-w-md">
-        <div className="text-6xl opacity-20">🎨</div>
-        <h3 className="text-pearl-text text-lg font-semibold">이미지를 생성해보세요</h3>
+    <div className="flex-1 flex justify-center items-center p-3 sm:p-4">
+      <div className="text-center space-y-4 max-w-md px-4">
+        <div className="text-4xl sm:text-6xl opacity-20">🎨</div>
+        <h3 className="text-pearl-text text-base sm:text-lg font-semibold">이미지를 생성해보세요</h3>
         <p className="text-pearl-text-muted text-sm leading-relaxed">
-          왼쪽에서 프롬프트를 입력하고 스타일을 선택한 후 생성 버튼을 눌러주세요.
+          <span className="block sm:hidden">위에서 프롬프트를 입력하고 스타일을 선택한 후 생성 버튼을 눌러주세요.</span>
+          <span className="hidden sm:block">왼쪽에서 프롬프트를 입력하고 스타일을 선택한 후 생성 버튼을 눌러주세요.</span>
           <br />
           생성된 이미지가 여기에 표시됩니다.
         </p>

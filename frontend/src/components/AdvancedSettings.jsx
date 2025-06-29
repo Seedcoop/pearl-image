@@ -32,7 +32,7 @@ const AdvancedSettings = ({
             setIsOpen(!isOpen)
           }}
         >
-          <h3 className="text-lg font-bold leading-tight tracking-[-0.015em]">고급 설정</h3>
+          <h3 className="text-base sm:text-lg font-bold leading-tight tracking-[-0.015em]">고급 설정</h3>
           <ChevronDown 
             className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
             size={18}
@@ -40,16 +40,16 @@ const AdvancedSettings = ({
         </summary>
         
         {isOpen && (
-          <div className="mt-3 space-y-4 bg-pearl-bg-medium p-3 rounded-lg shadow-inner">
+          <div className="mt-3 space-y-4 bg-pearl-bg-medium p-4 sm:p-3 rounded-lg shadow-inner">
             {/* Aspect Ratio */}
             <div>
-              <label className="text-pearl-text text-xs font-medium leading-normal block mb-1" htmlFor="aspect_ratio">
+              <label className="text-pearl-text text-sm sm:text-xs font-medium leading-normal block mb-2 sm:mb-1" htmlFor="aspect_ratio">
                 화면 비율
               </label>
               <select 
                 id="aspect_ratio" 
                 name="aspect_ratio" 
-                className="w-full p-2 text-sm rounded-lg pearl-abyss-input focus:outline-none focus:ring-2 focus:ring-pearl-primary"
+                className="w-full p-3 sm:p-2 text-sm rounded-lg pearl-abyss-input focus:outline-none focus:ring-2 focus:ring-pearl-primary"
                 value={aspectRatio}
                 onChange={(e) => onAspectRatioChange(e.target.value)}
               >
@@ -63,7 +63,7 @@ const AdvancedSettings = ({
 
             {/* Seed */}
             <div>
-              <label className="text-pearl-text text-xs font-medium leading-normal block mb-1" htmlFor="seed">
+              <label className="text-pearl-text text-sm sm:text-xs font-medium leading-normal block mb-2 sm:mb-1" htmlFor="seed">
                 시드 (선택사항)
               </label>
               <input 
@@ -76,7 +76,7 @@ const AdvancedSettings = ({
                 value={seed}
                 onChange={(e) => onSeedChange(parseInt(e.target.value) || 0)}
                 onDoubleClick={handleSeedDoubleClick}
-                className="w-full p-2 text-sm rounded-lg pearl-abyss-input focus:outline-none focus:ring-2 focus:ring-pearl-primary"
+                className="w-full p-3 sm:p-2 text-sm rounded-lg pearl-abyss-input focus:outline-none focus:ring-2 focus:ring-pearl-primary"
                 title="더블클릭하면 랜덤 시드 생성"
               />
             </div>

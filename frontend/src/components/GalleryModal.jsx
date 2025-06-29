@@ -9,20 +9,37 @@ const GalleryModal = ({ onClose }) => {
   }, [])
 
   const loadGalleryImages = () => {
-    const items = JSON.parse(localStorage.getItem('assetGallery') || '[]')
-    setGalleryItems(items)
+    try {
+      const items = JSON.parse(localStorage.getItem('assetGallery') || '[]')
+      setGalleryItems(items)
+    } catch (error) {
+      console.error('갤러리 로드 실패:', error)
+      // 손상된 데이터가 있을 경우 초기화
+      setGalleryItems([])
+      localStorage.removeItem('assetGallery')
+    }
   }
 
   const deleteItem = (id) => {
-    const updatedItems = galleryItems.filter(item => item.id !== id)
-    setGalleryItems(updatedItems)
-    localStorage.setItem('assetGallery', JSON.stringify(updatedItems))
+    try {
+      const updatedItems = galleryItems.filter(item => item.id !== id)
+      setGalleryItems(updatedItems)
+      localStorage.setItem('assetGallery', JSON.stringify(updatedItems))
+    } catch (error) {
+      console.error('이미지 삭제 실패:', error)
+      alert('이미지 삭제에 실패했습니다. 브라우저를 새로고침해주세요.')
+    }
   }
 
   const clearGallery = () => {
     if (confirm('모든 갤러리 이미지를 삭제하시겠습니까?')) {
-      setGalleryItems([])
-      localStorage.removeItem('assetGallery')
+      try {
+        setGalleryItems([])
+        localStorage.removeItem('assetGallery')
+      } catch (error) {
+        console.error('갤러리 전체 삭제 실패:', error)
+        alert('갤러리 삭제에 실패했습니다. 브라우저를 새로고침해주세요.')
+      }
     }
   }
 
@@ -58,31 +75,31 @@ const GalleryModal = ({ onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
-      <div className="bg-pearl-bg-dark rounded-lg shadow-xl max-w-4xl w-11/12 max-h-5/6 overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b border-pearl-border">
-          <h2 className="text-pearl-text text-2xl font-bold">생성된 에셋 갤러리</h2>
-          <div className="flex gap-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+      <div className="bg-pearl-bg-dark rounded-lg shadow-xl max-w-4xl w-full max-h-full overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-pearl-border flex-shrink-0">
+          <h2 className="text-pearl-text text-lg sm:text-2xl font-bold">생성된 에셋 갤러리</h2>
+          <div className="flex gap-2 sm:gap-4">
             <button 
               onClick={clearGallery}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              className="px-3 py-2 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-xs sm:text-sm"
             >
               전체 삭제
             </button>
             <button 
               onClick={onClose}
-              className="text-pearl-text-muted hover:text-pearl-text text-3xl transition-colors"
+              className="text-pearl-text-muted hover:text-pearl-text transition-colors touch-manipulation"
             >
               <X size={24} />
             </button>
           </div>
         </div>
         
-        <div className="p-6 overflow-y-auto max-h-96">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {galleryItems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {galleryItems.map((item) => (
-                <div key={item.id} className="bg-pearl-bg-medium rounded-lg p-4 shadow-lg">
+                <div key={item.id} className="bg-pearl-bg-medium rounded-lg p-3 sm:p-4 shadow-lg">
                   <div className="mb-3">
                     <img 
                       src={item.imageData || item.imagePath} 
@@ -114,14 +131,14 @@ const GalleryModal = ({ onClose }) => {
                     <div className="flex gap-2 pt-2">
                       <button 
                         onClick={() => downloadItem(item)}
-                        className="flex-1 flex items-center justify-center px-3 py-2 bg-pearl-accent text-pearl-bg-dark rounded text-xs font-semibold hover:bg-yellow-600 transition-colors"
+                        className="flex-1 flex items-center justify-center px-3 py-3 sm:py-2 bg-pearl-accent text-pearl-bg-dark rounded text-xs font-semibold hover:bg-yellow-600 transition-colors touch-manipulation"
                       >
                         <Download size={14} className="mr-1" />
                         다운로드
                       </button>
                       <button 
                         onClick={() => deleteItem(item.id)}
-                        className="flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-colors"
+                        className="flex items-center justify-center px-3 py-3 sm:py-2 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-colors touch-manipulation"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -132,10 +149,10 @@ const GalleryModal = ({ onClose }) => {
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="text-pearl-text-muted text-lg">
+              <div className="text-pearl-text-muted text-base sm:text-lg">
                 <ImageIcon size={48} className="mx-auto mb-4" />
                 저장된 에셋이 없습니다.<br />
-                에셋을 생성하고 '갤러리 저장' 버튼을 클릭하세요.
+                에셋을 생성하면 자동으로 갤러리에 저장됩니다.
               </div>
             </div>
           )}
