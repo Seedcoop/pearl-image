@@ -24,7 +24,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^5.0.8",
+    "vite": "^4.5.3",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6"
@@ -36,5 +36,9 @@
     "pearl-abyss"
   ],
   "author": "AssetForge Team",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": "18.x",
+    "npm": ">=8.0.0"
+  }
 } 
