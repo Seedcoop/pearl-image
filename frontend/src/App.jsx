@@ -51,7 +51,7 @@ function App() {
         finalPrompt = prompt + ', ' + selectedPreset.prompt
       }
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const API_URL = import.meta.env.VITE_API_URL || 'https://pearl-image-production.up.railway.app'
       const response = await fetch(`${API_URL}/generate`, {
         method: 'POST',
         headers: {
