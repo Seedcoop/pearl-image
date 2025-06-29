@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from rembg import remove
 import json
 import tempfile
+import traceback
 
 # --- Vertex AI Imports ---
 import vertexai
@@ -125,6 +126,7 @@ async def generate_image(request: ImageRequest):
 
         except Exception as api_error:
             print(f"Vertex AI Imagen API 호출 오류: {str(api_error)}")
+            traceback.print_exc()
             
             # 구체적인 에러 메시지 생성
             error_detail = str(api_error)
@@ -176,13 +178,15 @@ async def generate_image(request: ImageRequest):
             
         except Exception as img_error:
             print(f"이미지 처리 오류: {str(img_error)}")
-            import traceback
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"이미지 처리 중 심각한 오류가 발생했습니다: {str(img_error)}")
         
     except Exception as e:
-        print(f"Error during image generation: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"이미지 생성 중 오류가 발생했습니다: {str(e)}")
+        print(f"이미지 생성 중 예측하지 못한 오류 발생: {str(e)}")
+        traceback.print_exc()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"서버 내부 오류가 발생했습니다. 관리자에게 문의해주세요.")
 
 @app.get("/health")
 async def health_check():
