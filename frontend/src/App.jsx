@@ -28,10 +28,17 @@ function App() {
     setSelectedPreset(null)
   }
 
-  // 프리셋 선택
+  // 프리셋 선택 (이미 선택된 프리셋을 다시 클릭하면 해제)
   const handlePresetSelect = (presetKey) => {
     const presets = assetTypeStylePresets[currentAssetType] || {}
-    setSelectedPreset(presets[presetKey] || null)
+    const newPreset = presets[presetKey] || null
+    
+    // 이미 선택된 프리셋을 다시 클릭하면 해제
+    if (selectedPreset && selectedPreset === newPreset) {
+      setSelectedPreset(null)
+    } else {
+      setSelectedPreset(newPreset)
+    }
   }
 
   // 이미지 생성
@@ -107,6 +114,21 @@ function App() {
           
           localStorage.setItem('assetGallery', JSON.stringify(galleryItems))
           console.log('이미지가 자동으로 갤러리에 저장되었습니다!')
+
+          // 프롬프트 히스토리는 별도로 저장 (용량 제한 없이)
+          const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
+          const newPromptItem = {
+            id: Date.now(),
+            prompt: newResult.prompt,
+            timestamp: newResult.timestamp,
+            assetType: newResult.assetType,
+            preset: newResult.preset
+          }
+          
+          // 프롬프트는 맨 앞에 추가하고 제한 없이 저장
+          promptHistory.unshift(newPromptItem)
+          localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
+          console.log('프롬프트가 히스토리에 저장되었습니다!')
         } catch (storageError) {
           console.warn('갤러리 저장 실패:', storageError)
           // 저장 공간이 부족한 경우 기존 갤러리를 절반으로 줄이고 다시 시도
@@ -127,9 +149,43 @@ function App() {
             reducedItems.unshift(newItem)
             localStorage.setItem('assetGallery', JSON.stringify(reducedItems))
             console.log('갤러리 정리 후 이미지가 저장되었습니다!')
+
+            // 프롬프트 히스토리는 여전히 저장 (이미지 저장 실패와 무관)
+            try {
+              const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
+              const newPromptItem = {
+                id: Date.now(),
+                prompt: newResult.prompt,
+                timestamp: newResult.timestamp,
+                assetType: newResult.assetType,
+                preset: newResult.preset
+              }
+              promptHistory.unshift(newPromptItem)
+              localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
+              console.log('프롬프트가 히스토리에 저장되었습니다!')
+            } catch (promptError) {
+              console.warn('프롬프트 히스토리 저장 실패:', promptError)
+            }
           } catch (retryError) {
             console.error('갤러리 저장에 실패했습니다:', retryError)
             alert('갤러리 저장 공간이 부족합니다. 브라우저 캐시를 정리해주세요.')
+            
+            // 이미지 저장에 실패해도 프롬프트는 저장 시도
+            try {
+              const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
+              const newPromptItem = {
+                id: Date.now(),
+                prompt: newResult.prompt,
+                timestamp: newResult.timestamp,
+                assetType: newResult.assetType,
+                preset: newResult.preset
+              }
+              promptHistory.unshift(newPromptItem)
+              localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
+              console.log('프롬프트가 히스토리에 저장되었습니다!')
+            } catch (promptError) {
+              console.warn('프롬프트 히스토리 저장 실패:', promptError)
+            }
           }
         }
       } else {
