@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Deep Abyss & Pearl Color Variables */
+:root {
+    --pearl-abyss-primary: #1E40AF;
+    --pearl-abyss-accent: #3B82F6;
+    --pearl-abyss-bg-dark: #000000;
+    --pearl-abyss-bg-medium: #0A0A0A;
+    --pearl-abyss-bg-light: #1A1A1A;
+    --pearl-abyss-text: #E8F4FF;
+    --pearl-abyss-text-muted: #64748B;
+    --pearl-abyss-border: #1E293B;
+}
+
+/* Global Styles */
+@layer base {
+    body {
+        font-family: 'Space Grotesk', 'Noto Sans', sans-serif;
+        background-color: var(--pearl-abyss-bg-dark);
+        color: var(--pearl-abyss-text);
+    }
+}
+
+/* Pearl Abyss Components */
+@layer components {
+    .pearl-abyss-button {
+        @apply bg-gradient-to-r from-[var(--pearl-abyss-primary)] to-[var(--pearl-abyss-accent)] text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[var(--pearl-abyss-primary)] focus:ring-opacity-50;
+    }
+
+    .pearl-abyss-input {
+        @apply bg-[var(--pearl-abyss-bg-medium)] border border-[var(--pearl-abyss-border)] text-[var(--pearl-abyss-text)] rounded-lg focus:ring-2 focus:ring-[var(--pearl-abyss-primary)] focus:border-transparent;
+    }
+
+    .pearl-abyss-card {
+        @apply bg-[var(--pearl-abyss-bg-medium)] border border-[var(--pearl-abyss-border)] rounded-lg shadow-lg hover:shadow-xl transition-all duration-300;
+    }
+
+    .pearl-abyss-preset-card {
+        @apply pearl-abyss-card cursor-pointer hover:border-[var(--pearl-abyss-primary)] hover:shadow-[0_0_20px_rgba(30,64,175,0.3)];
+    }
+
+    .pearl-abyss-preset-selected {
+        @apply border-[var(--pearl-abyss-primary)] shadow-[0_0_20px_rgba(30,64,175,0.5)] scale-105;
+    }
+
+    .pearl-abyss-tab-active {
+        @apply border-b-[var(--pearl-abyss-primary)] text-[var(--pearl-abyss-primary)];
+    }
+
+    .pearl-abyss-tab-inactive {
+        @apply border-b-transparent text-[var(--pearl-abyss-text-muted)] hover:text-[var(--pearl-abyss-text)] hover:border-b-[var(--pearl-abyss-accent)];
+    }
+
+    .pearl-abyss-logo-text {
+        @apply text-2xl font-bold bg-gradient-to-r from-[var(--pearl-abyss-primary)] to-[var(--pearl-abyss-accent)] bg-clip-text text-transparent;
+    }
+
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+} 
