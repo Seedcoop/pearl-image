@@ -24,8 +24,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경변수가 필요합니다. (Google AI Studio에서 발급)")
 
-# 이미지 생성 모델 - Imagen 4 Fast (빠르고 저렴)
+# 이미지 생성 모델 - Imagen 4 Fast (텍스트 → 이미지)
 IMAGE_MODEL = os.getenv("IMAGE_MODEL", "imagen-4.0-fast-generate-001")
+# 이미지 편집 모델 - Gemini 2.5 Flash Image / Nano Banana (이미지 + 지시 → 이미지)
+EDIT_MODEL = os.getenv("EDIT_MODEL", "gemini-2.5-flash-image")
 
 # Imagen이 지원하는 화면 비율
 ALLOWED_ASPECT_RATIOS = {"1:1", "3:4", "4:3", "9:16", "16:9"}
@@ -54,6 +56,13 @@ class ImageRequest(BaseModel):
     transparent_bg: bool = False
 
 
+class EditRequest(BaseModel):
+    # 편집할 원본 이미지 (data URL "data:image/png;base64,..." 또는 순수 base64)
+    image_data: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1)
+    transparent_bg: bool = False
+
+
 def _extract_image_bytes(response) -> Optional[bytes]:
     """Imagen 응답에서 첫 번째 이미지의 원본 바이트를 추출한다."""
     images = getattr(response, "generated_images", None)
@@ -71,14 +80,78 @@ def _extract_image_bytes(response) -> Optional[bytes]:
     return data
 
 
+def _extract_from_candidates(response) -> Optional[bytes]:
+    """Gemini(generate_content) 응답에서 첫 번째 이미지 바이트를 추출한다."""
+    for candidate in getattr(response, "candidates", None) or []:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) if content else None
+        for part in parts or []:
+            inline = getattr(part, "inline_data", None)
+            data = getattr(inline, "data", None) if inline else None
+            if data:
+                return base64.b64decode(data) if isinstance(data, str) else data
+    return None
+
+
+def _decode_image_input(image_data: str) -> tuple[bytes, str]:
+    """data URL 또는 순수 base64 문자열을 (바이트, mime) 로 디코드한다."""
+    mime = "image/png"
+    payload = image_data.strip()
+    if payload.startswith("data:"):
+        header, _, payload = payload.partition(",")
+        if ";" in header and ":" in header:
+            mime = header.split(":", 1)[1].split(";", 1)[0] or mime
+    try:
+        return base64.b64decode(payload), mime
+    except Exception:
+        raise HTTPException(status_code=400, detail="이미지 데이터를 읽을 수 없습니다. 올바른 이미지를 업로드해주세요.")
+
+
+def _encode_png_response(img_bytes: bytes, transparent_bg: bool) -> dict:
+    """이미지 바이트를 후처리(투명배경)하고 base64 PNG data URL 응답으로 만든다."""
+    try:
+        img = Image.open(BytesIO(img_bytes))
+        if transparent_bg:
+            print("AI 배경 제거 시작...")
+            try:
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
+                img = remove(img)
+                print("AI 배경 제거 완료")
+            except Exception as rembg_error:
+                print(f"rembg 오류(원본 유지): {rembg_error}")
+        buffer = BytesIO()
+        img.save(buffer, "PNG")
+        img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return {
+            "success": True,
+            "image_data": f"data:image/png;base64,{img_base64}",
+            "message": "이미지가 성공적으로 생성되었습니다.",
+        }
+    except Exception as img_error:
+        print(f"이미지 처리 오류: {img_error}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"이미지 처리 중 오류가 발생했습니다: {img_error}")
+
+
+def _map_api_error(detail: str) -> str:
+    if any(k in detail for k in ("RESOURCE_EXHAUSTED", "Quota", "429")):
+        return "사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
+    if any(k in detail for k in ("Safety", "SAFETY", "blocked", "prohibited")):
+        return "안전 정책에 위배되어 이미지를 만들 수 없습니다. 다른 표현으로 시도해주세요."
+    if any(k in detail for k in ("API key", "API_KEY", "401", "403", "PERMISSION_DENIED")):
+        return "서버의 API 키가 유효하지 않거나 권한이 없습니다. 관리자에게 문의해주세요."
+    return f"이미지 생성 중 오류가 발생했습니다: {detail}"
+
+
 @app.post("/generate")
 async def generate_image(request: ImageRequest):
+    """텍스트 → 이미지 (Imagen 4 Fast)"""
     aspect_ratio = request.aspect_ratio if request.aspect_ratio in ALLOWED_ASPECT_RATIOS else "1:1"
     final_prompt = request.prompt.strip()
 
     print(f"Generating | model={IMAGE_MODEL} | ratio={aspect_ratio} | prompt={final_prompt}")
 
-    # 1) Imagen 호출
     try:
         response = client.models.generate_images(
             model=IMAGE_MODEL,
@@ -92,51 +165,51 @@ async def generate_image(request: ImageRequest):
     except Exception as api_error:
         print(f"Imagen API 오류: {api_error}")
         traceback.print_exc()
-        detail = str(api_error)
-        if any(k in detail for k in ("RESOURCE_EXHAUSTED", "Quota", "429")):
-            message = "사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요."
-        elif any(k in detail for k in ("Safety", "SAFETY", "blocked", "prohibited")):
-            message = "프롬프트가 안전 정책에 위배되어 이미지를 생성할 수 없습니다. 다른 표현으로 시도해주세요."
-        elif any(k in detail for k in ("API key", "API_KEY", "401", "403", "PERMISSION_DENIED")):
-            message = "서버의 API 키가 유효하지 않거나 권한이 없습니다. 관리자에게 문의해주세요."
-        else:
-            message = f"이미지 생성 중 오류가 발생했습니다: {detail}"
-        raise HTTPException(status_code=500, detail=message)
+        raise HTTPException(status_code=500, detail=_map_api_error(str(api_error)))
 
     if not img_bytes:
-        # 안전 필터로 인해 이미지가 반환되지 않은 경우가 대부분
         raise HTTPException(
             status_code=400,
             detail="이미지를 생성하지 못했습니다. 프롬프트가 안전 정책에 걸렸을 수 있어요. 다른 표현으로 시도해주세요.",
         )
 
-    # 2) 후처리 (투명 배경) + 인코딩
+    return _encode_png_response(img_bytes, request.transparent_bg)
+
+
+@app.post("/edit")
+async def edit_image(request: EditRequest):
+    """이미지 + 지시 → 편집된 이미지 (Gemini 2.5 Flash Image)"""
+    src_bytes, mime = _decode_image_input(request.image_data)
+    instruction = request.prompt.strip()
+
+    print(f"Editing | model={EDIT_MODEL} | mime={mime} | instruction={instruction}")
+
     try:
-        img = Image.open(BytesIO(img_bytes))
-
-        if request.transparent_bg:
-            print("AI 배경 제거 시작...")
-            try:
-                if img.mode != "RGBA":
-                    img = img.convert("RGBA")
-                img = remove(img)
-                print("AI 배경 제거 완료")
-            except Exception as rembg_error:
-                print(f"rembg 오류(원본 유지): {rembg_error}")
-
-        buffer = BytesIO()
-        img.save(buffer, "PNG")
-        img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-        return {
-            "success": True,
-            "image_data": f"data:image/png;base64,{img_base64}",
-            "message": "이미지가 성공적으로 생성되었습니다.",
-        }
-    except Exception as img_error:
-        print(f"이미지 처리 오류: {img_error}")
+        image_part = types.Part.from_bytes(data=src_bytes, mime_type=mime)
+        response = client.models.generate_content(
+            model=EDIT_MODEL,
+            contents=[instruction, image_part],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+            ),
+        )
+        img_bytes = _extract_from_candidates(response)
+    except HTTPException:
+        raise
+    except Exception as api_error:
+        print(f"편집 API 오류: {api_error}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"이미지 처리 중 오류가 발생했습니다: {img_error}")
+        raise HTTPException(status_code=500, detail=_map_api_error(str(api_error)))
+
+    if not img_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="이미지를 편집하지 못했습니다. 다른 지시로 시도하거나 다른 이미지를 사용해보세요.",
+        )
+
+    result = _encode_png_response(img_bytes, request.transparent_bg)
+    result["message"] = "이미지가 성공적으로 편집되었습니다."
+    return result
 
 
 @app.get("/health")
@@ -149,9 +222,11 @@ async def api_info():
     return {
         "service": "Pearl Image Generator",
         "version": "3.0.0",
-        "model": IMAGE_MODEL,
+        "generate_model": IMAGE_MODEL,
+        "edit_model": EDIT_MODEL,
         "endpoints": {
-            "/generate": "Generate image from text",
+            "/generate": "Generate image from text (Imagen 4 Fast)",
+            "/edit": "Edit an uploaded image with an instruction (Gemini 2.5 Flash Image)",
             "/health": "Health check",
             "/api/info": "API information",
         },
