@@ -1,301 +1,192 @@
 import React, { useState, useEffect } from 'react'
-import Header from './components/Header'
-import AssetTypeTabs from './components/AssetTypeTabs'
-import StylePresets from './components/StylePresets'
-import PromptInput from './components/PromptInput'
-import AdvancedSettings from './components/AdvancedSettings'
-import GenerateButton from './components/GenerateButton'
-import ResultSection from './components/ResultSection'
-import GalleryModal from './components/GalleryModal'
-import { assetTypeStylePresets } from './constants/presets'
+import { Sparkles, Download, ImageIcon, Loader2, AlertCircle, Wand2 } from 'lucide-react'
+import { stylePresets, aspectRatios, placeholderExamples } from './constants/presets'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
-  const [currentAssetType, setCurrentAssetType] = useState('free')
-  const [selectedPreset, setSelectedPreset] = useState(null)
   const [prompt, setPrompt] = useState('')
-  const [transparentBg, setTransparentBg] = useState(false)
+  const [styleId, setStyleId] = useState('none')
   const [aspectRatio, setAspectRatio] = useState('1:1')
-  const [guidanceScale, setGuidanceScale] = useState(7.5)
-  const [seed, setSeed] = useState(0)
+  const [transparentBg, setTransparentBg] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [showGallery, setShowGallery] = useState(false)
+  const [phIndex, setPhIndex] = useState(0)
 
-  // 에셋 타입 변경 시 프리셋 리셋
-  const handleAssetTypeChange = (assetType) => {
-    setCurrentAssetType(assetType)
-    setSelectedPreset(null)
-  }
+  // placeholder 회전
+  useEffect(() => {
+    const t = setInterval(() => {
+      setPhIndex((i) => (i + 1) % placeholderExamples.length)
+    }, 3500)
+    return () => clearInterval(t)
+  }, [])
 
-  // 프리셋 선택 (이미 선택된 프리셋을 다시 클릭하면 해제)
-  const handlePresetSelect = (presetKeyOrObject) => {
-    // presetKeyOrObject가 문자열이면 기본 프리셋, 객체면 사용자 정의 프리셋 또는 null
-    if (presetKeyOrObject === null) {
-      // 프리셋 해제
-      setSelectedPreset(null)
-      return
-    }
+  const canGenerate = prompt.trim().length > 0 && !isGenerating
 
-    if (typeof presetKeyOrObject === 'string') {
-      // 기본 프리셋 처리
-      const presets = assetTypeStylePresets[currentAssetType] || {}
-      const newPreset = presets[presetKeyOrObject] || null
-      
-      // 이미 선택된 프리셋을 다시 클릭하면 해제
-      if (selectedPreset && selectedPreset === newPreset) {
-        setSelectedPreset(null)
-      } else {
-        setSelectedPreset(newPreset)
-      }
-    } else {
-      // 사용자 정의 프리셋 처리 (객체)
-      const customPreset = presetKeyOrObject
-      
-      // 이미 선택된 사용자 정의 프리셋을 다시 클릭하면 해제
-      if (selectedPreset && selectedPreset.id && selectedPreset.id === customPreset.id) {
-        setSelectedPreset(null)
-      } else {
-        setSelectedPreset(customPreset)
-      }
-    }
-  }
-
-  // 이미지 생성
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      alert('프롬프트를 입력해주세요.')
-      return
-    }
-
+    if (!prompt.trim()) return
     setIsGenerating(true)
     setError(null)
     setResult(null)
 
-    try {
-      let finalPrompt = prompt
-      if (selectedPreset && selectedPreset.prompt) {
-        finalPrompt = prompt + ', ' + selectedPreset.prompt
-      }
+    const style = stylePresets.find((s) => s.id === styleId)
+    const finalPrompt = style && style.prompt ? `${prompt.trim()}, ${style.prompt}` : prompt.trim()
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      // 캐시 무시를 위한 timestamp 추가
-      const timestamp = Date.now()
-      const response = await fetch(`${API_URL}/generate?t=${timestamp}`, {
+    try {
+      const res = await fetch(`${API_URL}/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-        },
-        cache: 'no-store', // 브라우저 캐시 완전히 무시
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: finalPrompt,
           aspect_ratio: aspectRatio,
-          guidance_scale: guidanceScale,
-          seed: seed,
-          transparent_bg: transparentBg
-        })
+          transparent_bg: transparentBg,
+        }),
       })
+      const data = await res.json()
 
-      const data = await response.json()
-
-      if (data.success) {
-        const newResult = {
-          image_data: data.image_data,
-          prompt: finalPrompt,
-          timestamp: new Date().toISOString(),
-          assetType: currentAssetType,
-          preset: selectedPreset
-        }
-        
-        setResult(newResult)
-        
-        // 자동으로 갤러리에 저장 (용량 제한 적용)
-        try {
-          const galleryItems = JSON.parse(localStorage.getItem('assetGallery') || '[]')
-          const newItem = {
-            id: Date.now(),
-            imageData: newResult.image_data,
-            prompt: newResult.prompt,
-            timestamp: newResult.timestamp,
-            assetType: newResult.assetType,
-            preset: newResult.preset
-          }
-          
-          // 새 아이템을 맨 앞에 추가
-          galleryItems.unshift(newItem)
-          
-          // 최대 15개까지만 유지 (용량 절약)
-          const MAX_GALLERY_ITEMS = 15
-          if (galleryItems.length > MAX_GALLERY_ITEMS) {
-            galleryItems.splice(MAX_GALLERY_ITEMS)
-          }
-          
-          localStorage.setItem('assetGallery', JSON.stringify(galleryItems))
-          console.log('이미지가 자동으로 갤러리에 저장되었습니다!')
-
-          // 프롬프트 히스토리는 별도로 저장 (용량 제한 없이)
-          const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
-          const newPromptItem = {
-            id: Date.now(),
-            prompt: newResult.prompt,
-            timestamp: newResult.timestamp,
-            assetType: newResult.assetType,
-            preset: newResult.preset
-          }
-          
-          // 프롬프트는 맨 앞에 추가하고 제한 없이 저장
-          promptHistory.unshift(newPromptItem)
-          localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
-          console.log('프롬프트가 히스토리에 저장되었습니다!')
-        } catch (storageError) {
-          console.warn('갤러리 저장 실패:', storageError)
-          // 저장 공간이 부족한 경우 기존 갤러리를 절반으로 줄이고 다시 시도
-          try {
-            const galleryItems = JSON.parse(localStorage.getItem('assetGallery') || '[]')
-            const reducedItems = galleryItems.slice(0, Math.floor(galleryItems.length / 2))
-            localStorage.setItem('assetGallery', JSON.stringify(reducedItems))
-            
-            // 다시 저장 시도
-            const newItem = {
-              id: Date.now(),
-              imageData: newResult.image_data,
-              prompt: newResult.prompt,
-              timestamp: newResult.timestamp,
-              assetType: newResult.assetType,
-              preset: newResult.preset
-            }
-            reducedItems.unshift(newItem)
-            localStorage.setItem('assetGallery', JSON.stringify(reducedItems))
-            console.log('갤러리 정리 후 이미지가 저장되었습니다!')
-
-            // 프롬프트 히스토리는 여전히 저장 (이미지 저장 실패와 무관)
-            try {
-              const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
-              const newPromptItem = {
-                id: Date.now(),
-                prompt: newResult.prompt,
-                timestamp: newResult.timestamp,
-                assetType: newResult.assetType,
-                preset: newResult.preset
-              }
-              promptHistory.unshift(newPromptItem)
-              localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
-              console.log('프롬프트가 히스토리에 저장되었습니다!')
-            } catch (promptError) {
-              console.warn('프롬프트 히스토리 저장 실패:', promptError)
-            }
-          } catch (retryError) {
-            console.error('갤러리 저장에 실패했습니다:', retryError)
-            alert('갤러리 저장 공간이 부족합니다. 브라우저 캐시를 정리해주세요.')
-            
-            // 이미지 저장에 실패해도 프롬프트는 저장 시도
-            try {
-              const promptHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]')
-              const newPromptItem = {
-                id: Date.now(),
-                prompt: newResult.prompt,
-                timestamp: newResult.timestamp,
-                assetType: newResult.assetType,
-                preset: newResult.preset
-              }
-              promptHistory.unshift(newPromptItem)
-              localStorage.setItem('promptHistory', JSON.stringify(promptHistory))
-              console.log('프롬프트가 히스토리에 저장되었습니다!')
-            } catch (promptError) {
-              console.warn('프롬프트 히스토리 저장 실패:', promptError)
-            }
-          }
-        }
+      if (res.ok && data.success) {
+        setResult({ image: data.image_data, prompt: finalPrompt })
       } else {
-        setError(data.error || '알 수 없는 오류가 발생했습니다.')
+        setError(data.detail || data.error || '이미지 생성에 실패했습니다.')
       }
-    } catch (error) {
-      console.error('Error:', error)
-      setError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+    } catch (e) {
+      console.error(e)
+      setError('네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.')
     } finally {
       setIsGenerating(false)
     }
   }
 
+  const handleDownload = () => {
+    if (!result) return
+    const a = document.createElement('a')
+    a.href = result.image
+    a.download = `pearl-image-${Date.now()}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const onKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canGenerate) {
+      handleGenerate()
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-pearl-bg-dark text-pearl-text flex flex-col">
-      <Header onGalleryClick={() => setShowGallery(true)} />
+    <div className="app-shell">
+      {/* 배경 오브 */}
+      <div className="bg-orb bg-orb-1" />
+      <div className="bg-orb bg-orb-2" />
 
-      {/* Main Content - Responsive Layout */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Controls Panel */}
-        <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-r lg:border-b-0 border-pearl-border">
-          {/* Prompt Input Section */}
-          <div className="p-3 md:p-4 border-b border-pearl-border">
-            <PromptInput
-              prompt={prompt}
-              onPromptChange={setPrompt}
-              transparentBg={transparentBg}
-              onTransparentBgChange={setTransparentBg}
-              currentAssetType={currentAssetType}
+      <div className="container">
+        <header className="header">
+          <div className="logo">
+            <Sparkles size={22} className="logo-icon" />
+            <span>Pearl Image</span>
+          </div>
+          <span className="badge">Imagen 4 Fast</span>
+        </header>
+
+        <div className="grid">
+          {/* 컨트롤 패널 */}
+          <section className="card control">
+            <label className="field-label">
+              <Wand2 size={15} /> 무엇을 만들까요?
+            </label>
+            <textarea
+              className="prompt-input"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder={`예) ${placeholderExamples[phIndex]}`}
+              rows={4}
             />
-          </div>
 
-          {/* Scrollable Settings */}
-          <div className="flex-1 overflow-y-auto">
-            {/* Asset Type Tabs */}
-            <div className="border-b border-pearl-border">
-              <AssetTypeTabs
-                currentAssetType={currentAssetType}
-                onAssetTypeChange={handleAssetTypeChange}
-              />
+            <label className="field-label">스타일</label>
+            <div className="chips">
+              {stylePresets.map((s) => (
+                <button
+                  key={s.id}
+                  className={`chip ${styleId === s.id ? 'chip-active' : ''}`}
+                  onClick={() => setStyleId(s.id)}
+                  type="button"
+                >
+                  <span className="chip-emoji">{s.emoji}</span>
+                  {s.label}
+                </button>
+              ))}
             </div>
 
-            {/* Style Presets */}
-            <div className="p-3 md:p-4 border-b border-pearl-border">
-              <StylePresets
-                currentAssetType={currentAssetType}
-                selectedPreset={selectedPreset}
-                onPresetSelect={handlePresetSelect}
-              />
+            <label className="field-label">비율</label>
+            <div className="chips">
+              {aspectRatios.map((r) => (
+                <button
+                  key={r.id}
+                  className={`chip ${aspectRatio === r.id ? 'chip-active' : ''}`}
+                  onClick={() => setAspectRatio(r.id)}
+                  type="button"
+                >
+                  {r.label}
+                  <span className="chip-hint">{r.hint}</span>
+                </button>
+              ))}
             </div>
 
-            {/* Advanced Settings */}
-            <div className="p-3 md:p-4">
-              <AdvancedSettings
-                aspectRatio={aspectRatio}
-                onAspectRatioChange={setAspectRatio}
-                guidanceScale={guidanceScale}
-                onGuidanceScaleChange={setGuidanceScale}
-                seed={seed}
-                onSeedChange={setSeed}
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={transparentBg}
+                onChange={(e) => setTransparentBg(e.target.checked)}
               />
-            </div>
-          </div>
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+              <span>투명 배경 <span className="muted">(AI 배경 제거)</span></span>
+            </label>
 
-          {/* Generate Button */}
-          <div className="p-3 md:p-4 border-t border-pearl-border">
-            <GenerateButton
-              onGenerate={handleGenerate}
-              isGenerating={isGenerating}
-            />
-          </div>
+            <button className="generate-btn" onClick={handleGenerate} disabled={!canGenerate} type="button">
+              {isGenerating ? (
+                <><Loader2 size={18} className="spin" /> 생성 중...</>
+              ) : (
+                <><Sparkles size={18} /> 이미지 생성</>
+              )}
+            </button>
+            <p className="hint-text">⌘/Ctrl + Enter 로도 생성돼요</p>
+          </section>
+
+          {/* 결과 패널 */}
+          <section className="card result">
+            {isGenerating ? (
+              <div className="result-state">
+                <Loader2 size={40} className="spin accent" />
+                <p>이미지를 그리는 중...</p>
+                <span className="muted">보통 몇 초면 완성돼요</span>
+              </div>
+            ) : error ? (
+              <div className="result-state error">
+                <AlertCircle size={40} />
+                <p>{error}</p>
+              </div>
+            ) : result ? (
+              <div className="result-image-wrap">
+                <img src={result.image} alt={result.prompt} className="result-image" />
+                <button className="download-btn" onClick={handleDownload} type="button">
+                  <Download size={16} /> 다운로드
+                </button>
+              </div>
+            ) : (
+              <div className="result-state">
+                <ImageIcon size={40} className="muted" />
+                <p className="muted">생성된 이미지가 여기에 표시됩니다</p>
+              </div>
+            )}
+          </section>
         </div>
 
-        {/* Results Panel */}
-        <div className="w-full lg:w-1/2 flex flex-col min-h-[400px] lg:min-h-0">
-          <ResultSection
-            isGenerating={isGenerating}
-            result={result}
-            error={error}
-            onGalleryClick={() => setShowGallery(true)}
-          />
-        </div>
-      </main>
-
-      {/* Gallery Modal */}
-      {showGallery && (
-        <GalleryModal onClose={() => setShowGallery(false)} />
-      )}
+        <footer className="footer">Powered by Google Imagen 4 Fast</footer>
+      </div>
     </div>
   )
 }
 
-export default App 
+export default App

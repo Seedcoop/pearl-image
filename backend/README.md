@@ -1,6 +1,6 @@
 # 🚀 Pearl Image Generator - Backend
 
-FastAPI를 기반으로 한 Gemini Imagen 3 API 서버입니다.
+FastAPI 기반 텍스트→이미지 생성 API 서버입니다. Google **Imagen 4 Fast** 모델을 사용합니다.
 
 ## 📋 환경 요구사항
 
@@ -83,21 +83,27 @@ uvicorn main:app --reload
 
 | 엔드포인트 | 메서드 | 설명 |
 |-----------|--------|------|
-| `/` | GET | 메인 웹 인터페이스 (Frontend) |
-| `/generate-image` | POST | 이미지 생성 API |
+| `/generate` | POST | 이미지 생성 API (JSON) |
 | `/health` | GET | 서버 상태 확인 |
 | `/api/info` | GET | API 정보 |
 
 ### API 사용 예시
 
 ```bash
-curl -X POST "http://localhost:8000/generate-image" \
-  -H "Content-Type: multipart/form-data" \
-  -F "prompt=A beautiful sunset over mountains" \
-  -F "negative_prompt=blurry, low quality" \
-  -F "aspect_ratio=16:9" \
-  -F "style=photographic"
+curl -X POST "http://localhost:8000/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "a beautiful sunset over mountains",
+    "aspect_ratio": "16:9",
+    "transparent_bg": false
+  }'
 ```
+
+응답: `{ "success": true, "image_data": "data:image/png;base64,...", "message": "..." }`
+
+- `aspect_ratio` 지원값: `1:1`, `3:4`, `4:3`, `9:16`, `16:9`
+- `transparent_bg: true`면 rembg로 AI 배경 제거 후 투명 PNG 반환
+- 모델은 `IMAGE_MODEL` 환경변수로 변경 가능 (기본값 `imagen-4.0-fast-generate-001`)
 
 ## 🗂️ 생성된 이미지 저장
 
