@@ -4,7 +4,7 @@ import {
   Pencil, X, RefreshCw, Wand2,
 } from 'lucide-react'
 import {
-  stylePresets, aspectRatios, generateExamples,
+  stylePresets, generateExamples,
   editQuickActions, editExamples,
 } from './constants/presets'
 
@@ -14,7 +14,6 @@ function App() {
   const [mode, setMode] = useState('create') // 'create' | 'edit'
   const [prompt, setPrompt] = useState('')
   const [styleId, setStyleId] = useState('cartoon')
-  const [aspectRatio, setAspectRatio] = useState('1:1')
   const [transparentBg, setTransparentBg] = useState(false)
   const [editSource, setEditSource] = useState(null) // data URL of image to edit
   const [isBusy, setIsBusy] = useState(false)
@@ -69,7 +68,7 @@ function App() {
       const res = await fetch(`${API_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt, aspect_ratio: aspectRatio, transparent_bg: transparentBg }),
+        body: JSON.stringify({ prompt: finalPrompt, aspect_ratio: '1:1', transparent_bg: transparentBg }),
       })
       const data = await res.json()
       if (res.ok && data.success) setResult({ image: data.image_data, prompt: finalPrompt })
@@ -145,7 +144,7 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <Sparkles size={18} className="brand-icon" />
-          <span>Pearl Studio</span>
+          <span>DingADing Studio</span>
         </div>
         <div className="segmented">
           <button className={mode === 'create' ? 'seg on' : 'seg'} onClick={() => switchMode('create')}>
@@ -191,7 +190,7 @@ function App() {
             <Sparkles size={30} className="hero-icon" />
             <h1>{mode === 'create' ? '무엇이든 만들어보세요' : '이미지를 올려 편집을 시작하세요'}</h1>
             <p>{mode === 'create'
-              ? '게임에 쓸 캐릭터, 아이템, 배경을 한 줄로 만들어드려요'
+              ? '게임에 쓸 캐릭터, 아이템, 배경을 한 줄로 만들어요'
               : '가지고 있는 에셋을 올리고 포즈·표정·색상을 자유롭게 바꿔보세요'}</p>
             {mode === 'create' ? (
               <div className="chips center">
@@ -218,29 +217,20 @@ function App() {
           {/* options */}
           {mode === 'create' ? (
             <div className="options">
-              <div className="chips scroll">
+              <div className="chips">
                 {stylePresets.map((s) => (
                   <button key={s.id} className={`chip ${styleId === s.id ? 'on' : ''}`} onClick={() => setStyleId(s.id)}>
                     <span className="emoji">{s.emoji}</span>{s.label}
                   </button>
                 ))}
-              </div>
-              <div className="options-row">
-                <div className="chips">
-                  {aspectRatios.map((r) => (
-                    <button key={r.id} className={`chip sm ${aspectRatio === r.id ? 'on' : ''}`} onClick={() => setAspectRatio(r.id)}>
-                      {r.hint}
-                    </button>
-                  ))}
-                </div>
-                <button className={`chip sm toggle ${transparentBg ? 'on' : ''}`} onClick={() => setTransparentBg((v) => !v)}>
+                <button className={`chip toggle ${transparentBg ? 'on' : ''}`} onClick={() => setTransparentBg((v) => !v)}>
                   투명배경
                 </button>
               </div>
             </div>
           ) : (
             <div className="options">
-              <div className="chips scroll">
+              <div className="chips">
                 {editQuickActions.map((q) => (
                   <button
                     key={q.label}
