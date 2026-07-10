@@ -142,8 +142,16 @@ function App() {
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
-      <div className="glow glow-a" />
-      <div className="glow glow-b" />
+      {/* dreamy atmosphere */}
+      <div className="atmosphere">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="orb orb-4" />
+        <div className="veil" />
+      </div>
+      <div className="stars" />
+      <div className="noise" />
 
       {/* Top bar */}
       <header className="topbar">
