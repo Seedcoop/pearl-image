@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from rembg import remove
+from rembg import remove, new_session
 import traceback
 
 # --- Google GenAI (Imagen) ---
@@ -107,6 +107,18 @@ def _decode_image_input(image_data: str) -> tuple[bytes, str]:
         raise HTTPException(status_code=400, detail="이미지 데이터를 읽을 수 없습니다. 올바른 이미지를 업로드해주세요.")
 
 
+# rembg 세션은 첫 사용 시 한 번만 로드하고 이후 재사용한다 (요청마다 모델 재로딩 방지).
+_REMBG_MODEL = os.getenv("REMBG_MODEL", "u2net")
+_rembg_session = None
+
+
+def _get_rembg_session():
+    global _rembg_session
+    if _rembg_session is None:
+        _rembg_session = new_session(_REMBG_MODEL)
+    return _rembg_session
+
+
 def _encode_png_response(img_bytes: bytes, transparent_bg: bool) -> dict:
     """이미지 바이트를 후처리(투명배경)하고 base64 PNG data URL 응답으로 만든다."""
     try:
@@ -116,7 +128,8 @@ def _encode_png_response(img_bytes: bytes, transparent_bg: bool) -> dict:
             try:
                 if img.mode != "RGBA":
                     img = img.convert("RGBA")
-                img = remove(img)
+                # 캐시된 세션 재사용 + 마스크 후처리로 스프라이트 경계를 더 깔끔하게
+                img = remove(img, session=_get_rembg_session(), post_process_mask=True)
                 print("AI 배경 제거 완료")
             except Exception as rembg_error:
                 print(f"rembg 오류(원본 유지): {rembg_error}")
