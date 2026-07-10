@@ -8,7 +8,12 @@ import {
   editQuickActions, editExamples,
 } from './constants/presets'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// 우선순위: VITE_API_URL(있으면) > 개발이면 localhost > 배포면 기존 Railway 백엔드
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? 'http://localhost:8000'
+    : 'https://pearl-image-production.up.railway.app')
 
 function App() {
   const [mode, setMode] = useState('create') // 'create' | 'edit'
