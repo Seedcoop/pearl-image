@@ -1,6 +1,8 @@
 # 🚀 Pearl Image Generator - Backend
 
-FastAPI 기반 텍스트→이미지 생성 API 서버입니다. Google **Imagen 4 Fast** 모델을 사용합니다.
+FastAPI 기반 텍스트→이미지 생성/편집 API 서버입니다. Google **Gemini 2.5 Flash Image (Nano Banana)** 모델을 사용합니다.
+
+> ℹ️ 구 `imagen-4.0-fast-generate-001`(Imagen 4 Fast)에서 이전했습니다. Imagen 계열은 IPM(분당 이미지) 기반이라 Tier 1의 10 IPM 천장에서 버스트가 대량 실패했고, 2026-08-17 종료 예정입니다. Nano Banana는 RPM/RPD 기반이라 버스트에 훨씬 여유롭습니다.
 
 ## 📋 환경 요구사항
 
@@ -39,6 +41,19 @@ pip install -r requirements.txt
 ```env
 # Gemini API Key (필수)
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# 모델 (선택사항 - 기본값 gemini-2.5-flash-image)
+IMAGE_MODEL=gemini-2.5-flash-image
+EDIT_MODEL=gemini-2.5-flash-image
+
+# Rate limit / 재시도 (선택사항)
+# 서버측 토큰버킷 리미터가 버스트를 모델 RPM 밑으로 평탄화합니다.
+# 실측 RPM은 https://aistudio.google.com/rate-limit 에서 확인 후 조정하세요.
+GENERATE_RPM=20          # /generate 분당 허용치
+EDIT_RPM=20              # /edit 분당 허용치
+LIMITER_MAX_WAIT=20      # 리미터 최대 대기(초). 초과 시 429 + Retry-After 즉시 반환
+DEFAULT_RETRY_AFTER=10   # 재시도 지연을 못 읽었을 때의 Retry-After 기본값(초)
+MODEL_RETRIES=2          # Gemini 호출 실패 시 백엔드 지수 백오프 재시도 횟수
 
 # Server Configuration (선택사항)
 HOST=0.0.0.0
@@ -83,7 +98,8 @@ uvicorn main:app --reload
 
 | 엔드포인트 | 메서드 | 설명 |
 |-----------|--------|------|
-| `/generate` | POST | 이미지 생성 API (JSON) |
+| `/generate` | POST | 텍스트→이미지 생성 API (JSON) |
+| `/edit` | POST | 이미지+지시→편집 API (JSON) |
 | `/health` | GET | 서버 상태 확인 |
 | `/api/info` | GET | API 정보 |
 
@@ -101,9 +117,19 @@ curl -X POST "http://localhost:8000/generate" \
 
 응답: `{ "success": true, "image_data": "data:image/png;base64,...", "message": "..." }`
 
-- `aspect_ratio` 지원값: `1:1`, `3:4`, `4:3`, `9:16`, `16:9`
+- `aspect_ratio` 지원값: `1:1`, `3:4`, `4:3`, `9:16`, `16:9` (Nano Banana의 `image_config.aspect_ratio`로 전달)
 - `transparent_bg: true`면 rembg로 AI 배경 제거 후 투명 PNG 반환
-- 모델은 `IMAGE_MODEL` 환경변수로 변경 가능 (기본값 `imagen-4.0-fast-generate-001`)
+- 모델은 `IMAGE_MODEL` 환경변수로 변경 가능 (기본값 `gemini-2.5-flash-image`)
+
+### 상태 코드
+
+| 상황 | HTTP 상태 | 비고 |
+|------|-----------|------|
+| 정상 | 200 | |
+| 사용량 한도 초과(rate limit) | **429** | `Retry-After` 헤더 포함 → 프론트가 자동 백오프 재시도 |
+| 안전 정책 위반 | 422 | |
+| API 키/권한 문제 | 502 | 관리자 문의 안내 |
+| 그 외 오류 | 500 | |
 
 ## 🗂️ 생성된 이미지 저장
 

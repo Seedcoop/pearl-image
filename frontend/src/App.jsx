@@ -15,6 +15,24 @@ const API_URL =
     ? 'http://localhost:8000'
     : 'https://pearl-image-production.up.railway.app')
 
+// 429(혼잡) 응답이면 Retry-After(없으면 지수 백오프)만큼 기다렸다 자동 재시도한다.
+// runGenerate/runEdit가 공유. onRetry(attempt, waitMs)로 UI 상태를 갱신할 수 있다.
+const fetchWithRetry = async (url, options, { maxRetries = 3, onRetry } = {}) => {
+  let attempt = 0
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const res = await fetch(url, options)
+    if (res.status !== 429 || attempt >= maxRetries) return res
+    const headerVal = parseFloat(res.headers.get('Retry-After'))
+    const waitMs = Number.isFinite(headerVal)
+      ? headerVal * 1000
+      : Math.min(1000 * 2 ** attempt, 8000)
+    attempt += 1
+    if (onRetry) onRetry(attempt, waitMs)
+    await new Promise((r) => setTimeout(r, waitMs))
+  }
+}
+
 function App() {
   const [mode, setMode] = useState('create') // 'create' | 'edit'
   const [prompt, setPrompt] = useState('')
@@ -22,6 +40,7 @@ function App() {
   const [transparentBg, setTransparentBg] = useState(false)
   const [editSource, setEditSource] = useState(null) // data URL of image to edit
   const [isBusy, setIsBusy] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [phIndex, setPhIndex] = useState(0)
@@ -68,38 +87,40 @@ function App() {
   const runGenerate = async () => {
     const style = stylePresets.find((s) => s.id === styleId)
     const finalPrompt = style && style.prompt ? `${prompt.trim()}, ${style.prompt}` : prompt.trim()
-    setIsBusy(true); setError(null); setResult(null)
+    setIsBusy(true); setIsRetrying(false); setError(null); setResult(null)
     try {
-      const res = await fetch(`${API_URL}/generate`, {
+      const res = await fetchWithRetry(`${API_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: finalPrompt, aspect_ratio: '1:1', transparent_bg: transparentBg }),
-      })
-      const data = await res.json()
+      }, { onRetry: () => setIsRetrying(true) })
+      const data = await res.json().catch(() => ({}))
       if (res.ok && data.success) setResult({ image: data.image_data, prompt: finalPrompt })
+      else if (res.status === 429) setError('요청이 많아 잠시 후 다시 시도해주세요.')
       else setError(data.detail || '이미지 생성에 실패했습니다.')
     } catch (e) {
       console.error(e); setError('네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.')
-    } finally { setIsBusy(false) }
+    } finally { setIsBusy(false); setIsRetrying(false) }
   }
 
   const runEdit = async (instruction) => {
     if (!editSource) return
     const text = (instruction || prompt).trim()
     if (!text) return
-    setIsBusy(true); setError(null); setResult(null)
+    setIsBusy(true); setIsRetrying(false); setError(null); setResult(null)
     try {
-      const res = await fetch(`${API_URL}/edit`, {
+      const res = await fetchWithRetry(`${API_URL}/edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_data: editSource, prompt: text, transparent_bg: transparentBg }),
-      })
-      const data = await res.json()
+      }, { onRetry: () => setIsRetrying(true) })
+      const data = await res.json().catch(() => ({}))
       if (res.ok && data.success) setResult({ image: data.image_data, prompt: text })
+      else if (res.status === 429) setError('요청이 많아 잠시 후 다시 시도해주세요.')
       else setError(data.detail || '이미지 편집에 실패했습니다.')
     } catch (e) {
       console.error(e); setError('네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.')
-    } finally { setIsBusy(false) }
+    } finally { setIsBusy(false); setIsRetrying(false) }
   }
 
   const handleSubmit = () => {
@@ -176,7 +197,13 @@ function App() {
           <div className="stage">
             <div className="stage-loading">
               <Loader2 size={34} className="spin" />
-              <p>{mode === 'create' ? '이미지를 만드는 중...' : '이미지를 편집하는 중...'}</p>
+              <p>
+                {isRetrying
+                  ? '혼잡합니다. 잠시 후 자동 재시도 중...'
+                  : mode === 'create'
+                    ? '이미지를 만드는 중...'
+                    : '이미지를 편집하는 중...'}
+              </p>
             </div>
           </div>
         ) : result ? (
