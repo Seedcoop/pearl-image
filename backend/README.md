@@ -47,10 +47,11 @@ IMAGE_MODEL=gemini-2.5-flash-image
 EDIT_MODEL=gemini-2.5-flash-image
 
 # Rate limit / 재시도 (선택사항)
-# 서버측 토큰버킷 리미터가 버스트를 모델 RPM 밑으로 평탄화합니다.
-# 실측 RPM은 https://aistudio.google.com/rate-limit 에서 확인 후 조정하세요.
-GENERATE_RPM=20          # /generate 분당 허용치
-EDIT_RPM=20              # /edit 분당 허용치
+# 기본값 0 = 무제한: 서버에서 조이지 않고 모든 요청을 곧장 Gemini로 보냅니다.
+# Google이 실제로 429를 던지면 백엔드 백오프 재시도 + 프론트 자동 재시도가 흡수합니다.
+# 다시 조이려면 값을 지정하세요. 실측 RPM은 https://aistudio.google.com/rate-limit 참고.
+GENERATE_RPM=0           # /generate 분당 허용치 (0 = 무제한)
+EDIT_RPM=0               # /edit 분당 허용치 (0 = 무제한)
 LIMITER_MAX_WAIT=20      # 리미터 최대 대기(초). 초과 시 429 + Retry-After 즉시 반환
 DEFAULT_RETRY_AFTER=10   # 재시도 지연을 못 읽었을 때의 Retry-After 기본값(초)
 MODEL_RETRIES=2          # Gemini 호출 실패 시 백엔드 지수 백오프 재시도 횟수

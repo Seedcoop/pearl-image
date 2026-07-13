@@ -39,9 +39,12 @@ EDIT_MODEL = os.getenv("EDIT_MODEL", "gemini-2.5-flash-image")
 ALLOWED_ASPECT_RATIOS = {"1:1", "3:4", "4:3", "9:16", "16:9"}
 
 # --- Rate limit / 재시도 튜닝 (env로 조정) ---
-# 실측 RPM은 https://aistudio.google.com/rate-limit 에서 프로젝트별로 확인 후 반영.
-GENERATE_RPM = float(os.getenv("GENERATE_RPM", "20"))
-EDIT_RPM = float(os.getenv("EDIT_RPM", "20"))
+# 서버측 리미터는 기본 '무제한'(0)이다. 즉 서버에서 미리 조이지 않고 모든 요청을
+# 곧장 Gemini로 보낸다. Google이 실제로 429를 던지면 아래 백오프 재시도 + 프론트
+# 자동 재시도가 흡수한다. 나중에 다시 조이고 싶으면 env로 RPM 값을 지정하면 된다.
+# (실측 RPM은 https://aistudio.google.com/rate-limit 에서 프로젝트별로 확인)
+GENERATE_RPM = float(os.getenv("GENERATE_RPM", "0"))  # 0 = 무제한
+EDIT_RPM = float(os.getenv("EDIT_RPM", "0"))  # 0 = 무제한
 # 리미터에서 이 시간(초)보다 오래 기다려야 하면 무한 대기 대신 429로 즉시 반환.
 LIMITER_MAX_WAIT = float(os.getenv("LIMITER_MAX_WAIT", "20"))
 # 429 응답의 Retry-After 기본값(초). 예외에서 지연을 못 읽었을 때 사용.
@@ -95,6 +98,8 @@ class EditRequest(BaseModel):
 # ---------------------------------------------------------------------------
 class AsyncRateLimiter:
     def __init__(self, rate_per_min: float, burst: Optional[int] = None):
+        # rate_per_min <= 0 이면 '무제한' — acquire()가 항상 즉시 통과한다.
+        self.enabled = rate_per_min > 0
         self.rate = rate_per_min / 60.0  # tokens/sec
         self.capacity = burst or max(1, int(rate_per_min))
         self.tokens = float(self.capacity)
@@ -103,6 +108,8 @@ class AsyncRateLimiter:
 
     async def acquire(self, max_wait: float = 20.0) -> bool:
         """토큰을 하나 소비한다. max_wait 안에 못 얻으면 False(→ caller가 429 반환)."""
+        if not self.enabled:
+            return True
         deadline = time.monotonic() + max_wait
         while True:
             async with self.lock:
